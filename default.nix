@@ -14,8 +14,6 @@ in
 let
   inherit (pkgs.stdenv.hostPlatform) system;
 
-  mdevctl = pkgs.callPackage ./mdevctl {};
-
   combinedZipName = "NVIDIA-GRID-Linux-KVM-${vgpu-driver-version}-${wdys-driver-version}.zip";
   requireFile = { name, ... }@args: pkgs.requireFile (rec {
     inherit name;
@@ -324,8 +322,8 @@ in
 
       boot.kernelModules = [ "nvidia-vgpu-vfio" ];
 
-      environment.systemPackages = [ mdevctl ];
-      services.udev.packages = [ mdevctl ];
+      environment.systemPackages = [ pkgs.mdevctl ];
+      services.udev.packages = [ pkgs.mdevctl ];
 
     })
 

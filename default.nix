@@ -298,7 +298,7 @@ in
       systemd.services.fastapi-dls-mgr = {
         path = [ pkgs.openssl ];
         script = ''
-  WORKING_DIR=${cfg.fastapi-dls.dataDir}/fastapi-dls/cert
+  WORKING_DIR=${cfg.fastapi-dls.dataDir}/cert
   CERT_CHANGED=false
 
   recreate_private () {

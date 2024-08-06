@@ -9,6 +9,8 @@ let
   grid-driver-version = "535.129.03";
   wdys-driver-version = "537.70";
   grid-version = "16.2";
+  minimum-kernel-version = "6.1"; # Unsure of the actual minimum. 6.1 LTS should do.
+  maximum-kernel-version = "6.9";
   kernel-at-least-6 = lib.strings.versionAtLeast config.boot.kernelPackages.kernel.version "6.0";
 in
 let
@@ -76,16 +78,6 @@ in
   options = with lib; {
     hardware.nvidia.vgpu = {
       enable = mkEnableOption "vGPU support";
-
-      pinKernel = mkOption {
-        default = false;
-        type = types.bool;
-        description = ''
-          This will set kernel 6.1, a long term support release(LTS), higher kernels won't work with this module.
-          If the inputs of this module aren't set to follow the rest of nixpkgs in the inputs (inputs.nixpkgs.follows = "nixpkgs";), then this means your kernel will also be pinned to the nixpkgs revision of this module known to work, and you won't recieve the security updates from the LTS (until 31 Dec 2026).
-          Not recommended unless you are experiencing problems.
-        '';
-      };
 
       copyVGPUProfiles = mkOption {
         default = {};
@@ -207,18 +199,18 @@ in
     };
   };
 
-  config = lib.mkMerge [ ( lib.mkIf (cfg.enable && cfg.pinKernel) {
-
-      boot.kernelPackages = pkgs.linuxPackages_6_1; # 6.1, LTS Kernel
-
-    })
-    
-    ( lib.mkIf cfg.enable {
+  config = lib.mkMerge [ ( lib.mkIf cfg.enable {
   
       assertions = [
         {
           assertion = cfg.enable -> lib.elem "nvidia" config.services.xserver.videoDrivers;
           message = "hardware.nvidia.vgpu.enable requires the nvidia driver to be available (services.xserver.videoDrivers).";
+        }
+        {
+          assertion = cfg.enable
+            -> (lib.versionAtLeast config.boot.kernelPackages.kernel.version minimum-kernel-version)
+            -> (lib.versionOlder config.boot.kernelPackages.kernel.version maximum-kernel-version); # Patches supposedly support up till 6.8
+          message = "hardware.nvidia.vgpu.enable requires a kernel at least ${minimum-kernel-version} and below ${maximum-kernel-version}";
         }
       ];
       

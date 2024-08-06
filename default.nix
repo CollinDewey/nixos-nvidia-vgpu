@@ -171,31 +171,37 @@ in
 
       # submodule
       fastapi-dls = mkOption {
-        description = "Set up fastapi-dls host server";
+        description = "fastapi-dls host server";
         type = types.submodule {
           options = {
             enable = mkOption {
               default = false;
               type = types.bool;
-              description = "Set up fastapi-dls host server";
+              description = "Enable running fastapi-dls host server";
             };
-            docker-directory = mkOption {
-              description = "Path to your folder with docker containers";
-              default = "/opt/docker";
-              example = "/dockers";
+            dataDir = mkOption {
+              description = "Path to the fastapi-dls working directory";
+              default = "/opt/fastapi-dls";
+              example = "/opt/vgpu/data";
               type = types.str;
             };
-            local_ipv4 = mkOption {
-              description = "Your ipv4 or local hostname, needed for the fastapi-dls server. Leave blank to autodetect using hostname";
-              default = "";
+            host = mkOption {
+              description = "Your IP address or Hostname";
+              default = config.networking.hostName;
               example = "192.168.1.81";
               type = types.str;
             };
-            timezone = mkOption {
-              description = "Your timezone according to this list: https://docs.diladele.com/docker/timezones.html, needs to be the same as in the VM. Leave blank to autodetect";
-              default = "";
+            timeZone = mkOption {
+              description = "Time zone of fastapi-dls";
+              default = config.time.timeZone;
               example = "Europe/Lisbon";
               type = types.str;
+            };
+            port = mkOption {
+              description = "Port to listen on.";
+              default = "443";
+              example = "53492";
+              type = types.ints.unsigned;
             };
           };
         };
@@ -337,14 +343,14 @@ in
             sha256 = "sha256-1qvsVMzM4/atnQmxDMIamIVHCEYpxh0WDLLbANS2Wzw=";
           };
           volumes = [
-            "${cfg.fastapi-dls.docker-directory}/fastapi-dls/cert:/app/cert:rw"
-            "dls-db:/app/database"
+            "${cfg.fastapi-dls.dataDir}/cert:/app/cert:rw"
+            "${cfg.fastapi-dls.dataDir}/dls-db:/app/database"
           ];
           # Set environment variables
           environment = {
-            TZ = if cfg.fastapi-dls.timezone == "" then config.time.timeZone else "${cfg.fastapi-dls.timezone}";
-            DLS_URL = if cfg.fastapi-dls.local_ipv4 == "" then config.networking.hostName else "${cfg.fastapi-dls.local_ipv4}";
-            DLS_PORT = "443";
+            TZ = "${cfg.fastapi-dls.timeZone}";
+            DLS_URL = "${cfg.fastapi-dls.host}";
+            DLS_PORT = "${cfg.fastapi-dls.port}";
             LEASE_EXPIRE_DAYS="90";
             DATABASE = "sqlite:////app/database/db.sqlite";
             DEBUG = "true";
@@ -352,7 +358,7 @@ in
           extraOptions = [
           ];
           # Publish the container's port to the host
-          ports = [ "443:443" ];
+          ports = [ "${cfg.fastapi-dls.port}:443" ];
           # Do not automatically start the container, it will be managed
           autoStart = false;
         };
@@ -371,7 +377,7 @@ in
       systemd.services.fastapi-dls-mgr = {
         path = [ pkgs.openssl ];
         script = ''
-  WORKING_DIR=${cfg.fastapi-dls.docker-directory}/fastapi-dls/cert
+  WORKING_DIR=${cfg.fastapi-dls.dataDir}/fastapi-dls/cert
   CERT_CHANGED=false
 
   recreate_private () {

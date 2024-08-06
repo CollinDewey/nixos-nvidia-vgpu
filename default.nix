@@ -219,6 +219,13 @@ in
     
     ( lib.mkIf cfg.enable {
   
+      assertions = [
+        {
+          assertion = cfg.enable -> lib.elem "nvidia" config.services.xserver.videoDrivers;
+          message = "hardware.nvidia.vgpu.enable requires the nvidia driver to be available (services.xserver.videoDrivers).";
+        }
+      ];
+      
       hardware.nvidia.package = config.boot.kernelPackages.nvidiaPackages.stable.overrideAttrs (
         { patches ? [], postUnpack ? "", postPatch ? "", preFixup ? "", ... }@attrs: {
         # Overriding https://github.com/NixOS/nixpkgs/tree/nixos-unstable/pkgs/os-specific/linux/nvidia-x11

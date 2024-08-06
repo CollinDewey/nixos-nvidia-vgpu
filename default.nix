@@ -3,9 +3,9 @@ inputs: { pkgs, lib, config, ... }:
 let
   cfg = config.hardware.nvidia.vgpu;
 
-  driver-version = cfg.useMyDriver.driver-version; # "535.129.03";
+  driver-version = "535.129.03";
   # grid driver and wdys driver aren't actually used, but their versions are needed to find some filenames
-  vgpu-driver-version = cfg.useMyDriver.vgpu-driver-version; #"535.129.03";
+  vgpu-driver-version = "535.129.03";
   grid-driver-version = "535.129.03";
   wdys-driver-version = "537.70";
   grid-version = "16.2";
@@ -102,65 +102,6 @@ in
         '';
       };
 
-      useMyDriver = mkOption {
-        description = "Set up fastapi-dls host server";
-        type = types.submodule {
-          options = {
-            enable = mkOption {
-              default = false;
-              type = types.bool;
-              description = ''
-                If enabled, the module won't compile the merged driver from the normal nvidia driver and the vgpu driver.
-                You will be asked to add the driver to the store with nix-store --add-fixed sha256 file.zip
-                Can be useful if you already compiled a driver or if you needed to add a vcfgclone line for your graphics card that hasn't been added to the VGPU-Community-Drivers repo and compile your driver with that. 
-              '';
-            };
-            sha256 = mkOption {
-              default = "";
-              type = types.str;
-              example = "sha256-g8BM1g/tYv3G9vTKs581tfSpjB6ynX2+FaIOyFcDfdI=";
-              description = ''
-                The sha256 for the driver you compiled. Find it by running `nix hash file fileName.run`
-              '';
-            };
-            name = mkOption {
-              default = "";
-              type = types.str;
-              example = "NVIDIA-Linux-x86_64-525.105.17-merged-vgpu-kvm-patched.run";
-              description = ''
-                Name of your compiled driver
-              '';
-            };
-            getFromRemote = mkOption {
-              default = null;
-              type = types.nullOr types.package;
-              #example = "525.105.17";
-              description = ''
-                If you have your merged driver online you can use this. 
-                If used, instead of asking to supply the driver with `nix-store --add-fixed sha256 file`, will grab it from the online source.
-              '';
-            };
-            driver-version = mkOption {
-              default = "535.129.03";
-              type = types.str;
-              example = "525.105.17";
-              description = ''
-                Name of your compiled driver
-              '';
-            };
-            vgpu-driver-version = mkOption {
-              default = "535.129.03";
-              type = types.str;
-              example = "525.105.17";
-              description = ''
-                Name of your compiled driver
-              '';
-            };
-          };
-        };
-        default = {};
-      };
-
       # submodule
       fastapi-dls = mkOption {
         description = "fastapi-dls host server";
@@ -222,22 +163,7 @@ in
         version = "${driver-version}";
 
         # the new driver (compiled in a derivation above)
-        src = if (!cfg.useMyDriver.enable) then
-          "${compiled-driver}/NVIDIA-Linux-x86_64-${driver-version}-merged-vgpu-kvm-patched.run"
-          else
-            if (cfg.useMyDriver.getFromRemote != null) then
-              cfg.useMyDriver.getFromRemote
-            else
-              pkgs.requireFile {
-                name = cfg.useMyDriver.name;
-                url = "compile it with the repo https://github.com/VGPU-Community-Drivers/vGPU-Unlock-patcher 😉, also if you got this error the hash might be wrong, use `nix hash file <file>`";
-                # The hash below was computed like so:
-                #
-                # $ nix hash file foo.txt
-                # sha256-9fhYGu9fqxcQC2Kc81qh2RMo1QcLBUBo8U+pPn+jthQ=
-                #
-                sha256 = cfg.useMyDriver.sha256;
-              };
+        src = "${compiled-driver}/NVIDIA-Linux-x86_64-${driver-version}-merged-vgpu-kvm-patched.run";
 
         postPatch = if postPatch != null then postPatch + ''
           # Move path for vgpuConfig.xml into /etc

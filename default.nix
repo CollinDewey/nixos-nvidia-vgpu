@@ -253,7 +253,7 @@ in
 
     })
 
-    (lib.mkIf (cfg.enable && cfg.fastapi-dls.enable) {
+    (lib.mkIf cfg.fastapi-dls.enable {
     
       virtualisation.oci-containers.containers = {
         fastapi-dls = {

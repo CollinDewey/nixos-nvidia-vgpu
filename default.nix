@@ -174,16 +174,12 @@ in
         description = "fastapi-dls host server";
         type = types.submodule {
           options = {
-            enable = mkOption {
-              default = false;
-              type = types.bool;
-              description = "Enable running fastapi-dls host server";
-            };
+            enable = mkEnableOption "Enable running the fastapi-dls host server";
             dataDir = mkOption {
               description = "Path to the fastapi-dls working directory";
-              default = "/opt/fastapi-dls";
+              default = "/var/lib/fastapi-dls";
               example = "/opt/vgpu/data";
-              type = types.str;
+              type = types.path;
             };
             host = mkOption {
               description = "Your IP address or Hostname";
@@ -195,7 +191,7 @@ in
               description = "Time zone of fastapi-dls";
               default = config.time.timeZone;
               example = "Europe/Lisbon";
-              type = types.str;
+              type = types.timezone;
             };
             port = mkOption {
               description = "Port to listen on.";

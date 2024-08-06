@@ -322,8 +322,7 @@ in
 
       boot.kernelModules = [ "nvidia-vgpu-vfio" ];
 
-      environment.systemPackages = [ pkgs.mdevctl ];
-      services.udev.packages = [ pkgs.mdevctl ];
+      programs.mdevctl = true;
 
     })
 

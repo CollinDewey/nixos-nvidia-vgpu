@@ -428,13 +428,13 @@ in
 
   check_recreate
 
-  if ( ! systemctl is-active --quiet podman-fastapi-dls.service); then
-    echo "Starting podman-fastapi-dls.service..."
-    systemctl start podman-fastapi-dls.service
+  if ( ! systemctl is-active --quiet ${cfg.virtualisation.oci-containers.backend}-fastapi-dls.service); then
+    echo "Starting ${cfg.virtualisation.oci-containers.backend}-fastapi-dls.service..."
+    systemctl start ${cfg.virtualisation.oci-containers.backend}-fastapi-dls.service
   elif $CERT_CHANGED; then
-    echo "Restarting podman-fastapi-dls.service due to certificate change..."
-    systemctl stop podman-fastapi-dls.service
-    systemctl start podman-fastapi-dls.service
+    echo "Restarting ${cfg.virtualisation.oci-containers.backend}-fastapi-dls.service due to certificate change..."
+    systemctl stop ${cfg.virtualisation.oci-containers.backend}-fastapi-dls.service
+    systemctl start ${cfg.virtualisation.oci-containers.backend}-fastapi-dls.service
   fi
   '';
         serviceConfig = {

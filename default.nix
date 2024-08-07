@@ -215,7 +215,7 @@ in
 
       boot.kernelModules = [ "nvidia-vgpu-vfio" ];
 
-      programs.mdevctl = true;
+      programs.mdevctl.enable = true;
 
     })
 

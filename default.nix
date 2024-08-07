@@ -93,6 +93,7 @@ in
 
       fastapi-dls = mkOption {
         description = "fastapi-dls host server";
+        default = {};
         type = types.submodule {
           options = {
             enable = mkEnableOption "Enable running the fastapi-dls host server";
@@ -123,7 +124,6 @@ in
           };
         };
       };
-      
     };
   };
 

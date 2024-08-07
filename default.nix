@@ -35,7 +35,7 @@ let
           owner = "VGPU-Community-Drivers";
           repo = "vGPU-Unlock-patcher";
           rev = "3765eee908858d069e7b31842f3486095b0846b5";
-          hash = "sha256-PR61ylYgTaWQ/xxMDR8ZUUA5vQNUcZvIt/hqgpAQeNM=";
+          hash = "sha256-jNyZbaeblO66aQu9f+toT8pu3Tgj1xpdiU5DgY82Fv8=";
           fetchSubmodules = true;
         };
         original_driver_src = pkgs.fetchurl {

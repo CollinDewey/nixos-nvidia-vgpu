@@ -113,7 +113,7 @@ in
               description = "Time zone of fastapi-dls";
               default = config.time.timeZone;
               example = "Europe/Lisbon";
-              type = types.timezone;
+              type = types.addCheck types.str (str: filter (c: c == " ") (stringToCharacters str) == []);
             };
             port = mkOption {
               description = "Port to listen on.";
@@ -234,16 +234,16 @@ in
             "${cfg.fastapi-dls.dataDir}/dls-db:/app/database"
           ];
           environment = {
-            TZ = "${cfg.fastapi-dls.timeZone}";
-            DLS_URL = "${cfg.fastapi-dls.host}";
-            DLS_PORT = "${cfg.fastapi-dls.port}";
+            TZ = cfg.fastapi-dls.timeZone;
+            DLS_URL = cfg.fastapi-dls.host;
+            DLS_PORT = builtins.toString cfg.fastapi-dls.port;
             LEASE_EXPIRE_DAYS="90";
             DATABASE = "sqlite:////app/database/db.sqlite";
             DEBUG = "true";
           };
           extraOptions = [
           ];
-          ports = [ "${cfg.fastapi-dls.port}:443" ];
+          ports = [ "${builtins.toString cfg.fastapi-dls.port}:443" ];
           autoStart = false; # Started by fastapi-dls-mgr
         };
       };
@@ -321,13 +321,13 @@ in
 
           check_recreate
 
-          if ( ! systemctl is-active --quiet ${cfg.virtualisation.oci-containers.backend}-fastapi-dls.service); then
-            echo "Starting ${cfg.virtualisation.oci-containers.backend}-fastapi-dls.service..."
-            systemctl start ${cfg.virtualisation.oci-containers.backend}-fastapi-dls.service
+          if ( ! systemctl is-active --quiet ${config.virtualisation.oci-containers.backend}-fastapi-dls.service); then
+            echo "Starting ${config.virtualisation.oci-containers.backend}-fastapi-dls.service..."
+            systemctl start ${config.virtualisation.oci-containers.backend}-fastapi-dls.service
           elif $CERT_CHANGED; then
-            echo "Restarting ${cfg.virtualisation.oci-containers.backend}-fastapi-dls.service due to certificate change..."
-            systemctl stop ${cfg.virtualisation.oci-containers.backend}-fastapi-dls.service
-            systemctl start ${cfg.virtualisation.oci-containers.backend}-fastapi-dls.service
+            echo "Restarting ${config.virtualisation.oci-containers.backend}-fastapi-dls.service due to certificate change..."
+            systemctl stop ${config.virtualisation.oci-containers.backend}-fastapi-dls.service
+            systemctl start ${config.virtualisation.oci-containers.backend}-fastapi-dls.service
           fi
         '';
       };

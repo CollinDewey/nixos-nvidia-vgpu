@@ -3,19 +3,12 @@ inputs: { pkgs, lib, config, ... }:
 let
   cfg = config.hardware.nvidia.vgpu;
 
-  driver-version = "535.129.03";
-  # grid driver and wdys driver aren't actually used, but their versions are needed to find some filenames
   vgpu-driver-version = "535.129.03";
-  grid-driver-version = "535.129.03";
   wdys-driver-version = "537.70";
-  grid-version = "16.2";
   minimum-kernel-version = "6.1"; # Unsure of the actual minimum. 6.1 LTS should do.
   maximum-kernel-version = "6.9";
-  kernel-at-least-6 = lib.strings.versionAtLeast config.boot.kernelPackages.kernel.version "6.0";
 in
 let
-  inherit (pkgs.stdenv.hostPlatform) system;
-
   combinedZipName = "NVIDIA-GRID-Linux-KVM-${vgpu-driver-version}-${wdys-driver-version}.zip";
   requireFile = { name, ... }@args: pkgs.requireFile (rec {
     inherit name;
@@ -35,42 +28,38 @@ let
   } // args);
 
   compiled-driver = pkgs.stdenv.mkDerivation {
-    name = "NVIDIA-Linux-x86_64-${driver-version}-merged-vgpu-kvm-patched";
-      nativeBuildInputs = [ pkgs.p7zip pkgs.unzip pkgs.coreutils pkgs.bash pkgs.zstd];
+    name = "NVIDIA-Linux-x86_64-${vgpu-driver-version}-merged-vgpu-kvm-patched";
+      nativeBuildInputs = [ pkgs.p7zip pkgs.unzip pkgs.coreutils pkgs.bash pkgs.zstd ];
         system = "x86_64-linux";
         src = pkgs.fetchFromGitHub {
           owner = "VGPU-Community-Drivers";
           repo = "vGPU-Unlock-patcher";
-          # 535.129
           rev = "3765eee908858d069e7b31842f3486095b0846b5";
           hash = "sha256-PR61ylYgTaWQ/xxMDR8ZUUA5vQNUcZvIt/hqgpAQeNM=";
           fetchSubmodules = true;
-          deepClone = true;
         };
         original_driver_src = pkgs.fetchurl {
-          # Hosted by nvidia
-          url = "https://download.nvidia.com/XFree86/Linux-x86_64/${driver-version}/NVIDIA-Linux-x86_64-${driver-version}.run";
+          url = "https://download.nvidia.com/XFree86/Linux-x86_64/${vgpu-driver-version}/NVIDIA-Linux-x86_64-${vgpu-driver-version}.run";
           sha256 = "e6dca5626a2608c6bb2a046cfcb7c1af338b9e961a7dd90ac09bb8a126ff002e";
         };
         vgpu_driver_src = requireFile {
-            name = "NVIDIA-GRID-Linux-KVM-${driver-version}-${wdys-driver-version}.zip";
-            sha256 = cfg.vgpu_driver_src.sha256; # nix hash file foo.txt
+            name = "NVIDIA-GRID-Linux-KVM-${vgpu-driver-version}-${wdys-driver-version}.zip";
+            sha256 = cfg.vgpu_driver_src.sha256;
           };
  
         buildPhase = ''
           mkdir -p $out
           cd $TMPDIR
-          #ln -s $original_driver_src NVIDIA-Linux-x86_64-${driver-version}.run
-          ln -s $vgpu_driver_src NVIDIA-GRID-Linux-KVM-${driver-version}-${wdys-driver-version}.zip
+          ln -s $vgpu_driver_src NVIDIA-GRID-Linux-KVM-${vgpu-driver-version}-${wdys-driver-version}.zip
           
-          ${pkgs.unzip}/bin/unzip -j NVIDIA-GRID-Linux-KVM-${driver-version}-${wdys-driver-version}.zip Host_Drivers/NVIDIA-Linux-x86_64-${driver-version}-vgpu-kvm.run
+          ${pkgs.unzip}/bin/unzip -j NVIDIA-GRID-Linux-KVM-${vgpu-driver-version}-${wdys-driver-version}.zip Host_Drivers/NVIDIA-Linux-x86_64-${vgpu-driver-version}-vgpu-kvm.run
           cp -a $src/* .
-          cp -a $original_driver_src NVIDIA-Linux-x86_64-${driver-version}.run
+          cp -a $original_driver_src NVIDIA-Linux-x86_64-${vgpu-driver-version}.run
 
           sed -i '0,/^    vcfgclone \''${TARGET}\/vgpuConfig.xml /s//${lib.attrsets.foldlAttrs (s: n: v: s + "    vcfgclone \\\${TARGET}\\/vgpuConfig.xml 0x${builtins.substring 0 4 v} 0x${builtins.substring 5 4 v} 0x${builtins.substring 0 4 n} 0x${builtins.substring 5 4 n}\\n") "" cfg.copyVGPUProfiles}&/' ./patch.sh
           
-          bash ./patch.sh ${lib.optionalString kernel-at-least-6 "--force-nvidia-gpl-I-know-it-is-wrong --enable-nvidia-gpl-for-experimenting"} --repack general-merge
-          cp -a NVIDIA-Linux-x86_64-${driver-version}-merged-vgpu-kvm-patched.run $out
+          bash ./patch.sh --repack general-merge
+          cp -a NVIDIA-Linux-x86_64-${vgpu-driver-version}-merged-vgpu-kvm-patched.run $out
         '';
   };
 in
@@ -102,7 +91,6 @@ in
         '';
       };
 
-      # submodule
       fastapi-dls = mkOption {
         description = "fastapi-dls host server";
         type = types.submodule {
@@ -134,7 +122,6 @@ in
             };
           };
         };
-        default = {};
       };
       
     };
@@ -156,40 +143,22 @@ in
       ];
       
       hardware.nvidia.package = config.boot.kernelPackages.nvidiaPackages.stable.overrideAttrs (
-        { patches ? [], postUnpack ? "", postPatch ? "", preFixup ? "", ... }@attrs: {
+        { patches ? [], postUnpack ? "", postPatch ? "", preFixup ? "", ... }: {
         # Overriding https://github.com/NixOS/nixpkgs/tree/nixos-unstable/pkgs/os-specific/linux/nvidia-x11
         # that gets called from the option hardware.nvidia.package from here: https://github.com/NixOS/nixpkgs/blob/nixos-22.11/nixos/modules/hardware/video/nvidia.nix
-        name = "NVIDIA-Linux-x86_64-${driver-version}-merged-vgpu-kvm-patched-${config.boot.kernelPackages.kernel.version}";
-        version = "${driver-version}";
+        name = "NVIDIA-Linux-x86_64-${vgpu-driver-version}-merged-vgpu-kvm-patched-${config.boot.kernelPackages.kernel.version}";
+        version = "${vgpu-driver-version}";
 
-        # the new driver (compiled in a derivation above)
-        src = "${compiled-driver}/NVIDIA-Linux-x86_64-${driver-version}-merged-vgpu-kvm-patched.run";
+        src = "${compiled-driver}/NVIDIA-Linux-x86_64-${vgpu-driver-version}-merged-vgpu-kvm-patched.run";
 
-        postPatch = if postPatch != null then postPatch + ''
+        postPatch = (if postPatch != null then postPatch else "") + ''
           # Move path for vgpuConfig.xml into /etc
           sed -i 's|/usr/share/nvidia/vgpu|/etc/nvidia-vgpu-xxxxx|' nvidia-vgpud
 
           substituteInPlace sriov-manage \
-            --replace lspci ${pkgs.pciutils}/bin/lspci \
-            --replace setpci ${pkgs.pciutils}/bin/setpci
-        '' else ''
-          # Move path for vgpuConfig.xml into /etc
-          sed -i 's|/usr/share/nvidia/vgpu|/etc/nvidia-vgpu-xxxxx|' nvidia-vgpud
-
-          substituteInPlace sriov-manage \
-            --replace lspci ${pkgs.pciutils}/bin/lspci \
-            --replace setpci ${pkgs.pciutils}/bin/setpci
+            --replace-fail lspci ${pkgs.pciutils}/bin/lspci \
+            --replace-fail setpci ${pkgs.pciutils}/bin/setpci
         '';
-
-        /*
-        postPatch = postPatch + ''
-          # Move path for vgpuConfig.xml into /etc
-          sed -i 's|/usr/share/nvidia/vgpu|/etc/nvidia-vgpu-xxxxx|' nvidia-vgpud
-
-          substituteInPlace sriov-manage \
-            --replace lspci ${pkgs.pciutils}/bin/lspci \
-            --replace setpci ${pkgs.pciutils}/bin/setpci
-        ''; */
 
         # HACK: Using preFixup instead of postInstall since nvidia-x11 builder.sh doesn't support hooks
         preFixup = preFixup + ''
@@ -218,7 +187,7 @@ in
           Type = "forking";
           ExecStart = "${lib.getBin config.hardware.nvidia.package}/bin/nvidia-vgpud";
           ExecStopPost = "${pkgs.coreutils}/bin/rm -rf /var/run/nvidia-vgpud";
-          Environment = [ "__RM_NO_VERSION_CHECK=1" ]; # I think it's not needed anymore? (Avoids issue with API version incompatibility when merging host/client drivers)
+          Environment = [ "__RM_NO_VERSION_CHECK=1" ];
         };
       };
 
@@ -232,7 +201,7 @@ in
           KillMode = "process";
           ExecStart = "${lib.getBin config.hardware.nvidia.package}/bin/nvidia-vgpu-mgr";
           ExecStopPost = "${pkgs.coreutils}/bin/rm -rf /var/run/nvidia-vgpu-mgr";
-          environment = [
+          Environment = [
             "__RM_NO_VERSION_CHECK=1"
             "LD_LIBRARY_PATH=${pkgs.glib.out}/lib:$LD_LIBRARY_PATH"
             "LD_PRELOAD=${pkgs.glib.out}/lib/libglib-2.0.so"
@@ -240,10 +209,7 @@ in
         };
       };
       
-      boot.extraModprobeConfig = 
-        ''
-        options nvidia vup_sunlock=1 vup_swrlwar=1 vup_qmode=1
-        ''; # (for driver 535) bypasses `error: vmiop_log: NVOS status 0x1` in nvidia-vgpu-mgr.service when starting VM
+      boot.extraModprobeConfig = "options nvidia vup_sunlock=1 vup_swrlwar=1 vup_qmode=1";
 
       environment.etc."nvidia-vgpu-xxxxx/vgpuConfig.xml".source = config.hardware.nvidia.package + /vgpuConfig.xml;
 
@@ -267,7 +233,6 @@ in
             "${cfg.fastapi-dls.dataDir}/cert:/app/cert:rw"
             "${cfg.fastapi-dls.dataDir}/dls-db:/app/database"
           ];
-          # Set environment variables
           environment = {
             TZ = "${cfg.fastapi-dls.timeZone}";
             DLS_URL = "${cfg.fastapi-dls.host}";
@@ -278,10 +243,8 @@ in
           };
           extraOptions = [
           ];
-          # Publish the container's port to the host
           ports = [ "${cfg.fastapi-dls.port}:443" ];
-          # Do not automatically start the container, it will be managed
-          autoStart = false;
+          autoStart = false; # Started by fastapi-dls-mgr
         };
       };
 
@@ -297,76 +260,76 @@ in
 
       systemd.services.fastapi-dls-mgr = {
         path = [ pkgs.openssl ];
-        script = ''
-  WORKING_DIR=${cfg.fastapi-dls.dataDir}/cert
-  CERT_CHANGED=false
-
-  recreate_private () {
-    echo "Recreating private key..."
-    rm -f $WORKING_DIR/instance.private.pem
-    openssl genrsa -out $WORKING_DIR/instance.private.pem 2048
-  }
-
-  recreate_public () {
-    echo "Recreating public key..."
-    rm -f $WORKING_DIR/instance.public.pem
-    openssl rsa -in $WORKING_DIR/instance.private.pem -outform PEM -pubout -out $WORKING_DIR/instance.public.pem
-  }
-
-  recreate_certs () {
-    echo "Recreating certificates..."
-    rm -f $WORKING_DIR/webserver.key
-    rm -f $WORKING_DIR/webserver.crt
-    openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout $WORKING_DIR/webserver.key -out $WORKING_DIR/webserver.crt -subj "/C=XX/ST=StateName/L=CityName/O=CompanyName/OU=CompanySectionName/CN=CommonNameOrHostname"
-  }
-
-  check_recreate() {
-    echo "Checking if certificates need to be recreated..."
-    if [ ! -e $WORKING_DIR/instance.private.pem ]; then
-      echo "Private key missing, recreating..."
-      recreate_private
-      recreate_public
-      recreate_certs
-      CERT_CHANGED=true
-    fi
-    if [ ! -e $WORKING_DIR/instance.public.pem ]; then
-      echo "Public key missing, recreating..."
-      recreate_public
-      recreate_certs
-      CERT_CHANGED=true
-    fi
-    if [ ! -e $WORKING_DIR/webserver.key ] || [ ! -e $WORKING_DIR/webserver.crt ]; then
-      echo "Webserver certificates missing, recreating..."
-      recreate_certs
-      CERT_CHANGED=true
-    fi
-    if ( ! openssl x509 -checkend 864000 -noout -in $WORKING_DIR/webserver.crt); then
-      echo "Webserver certificate will expire soon, recreating..."
-      recreate_certs
-      CERT_CHANGED=true
-    fi
-  }
-
-  echo "Ensuring working directory exists..."
-  if [ ! -d $WORKING_DIR ]; then
-    mkdir -p $WORKING_DIR
-  fi
-
-  check_recreate
-
-  if ( ! systemctl is-active --quiet ${cfg.virtualisation.oci-containers.backend}-fastapi-dls.service); then
-    echo "Starting ${cfg.virtualisation.oci-containers.backend}-fastapi-dls.service..."
-    systemctl start ${cfg.virtualisation.oci-containers.backend}-fastapi-dls.service
-  elif $CERT_CHANGED; then
-    echo "Restarting ${cfg.virtualisation.oci-containers.backend}-fastapi-dls.service due to certificate change..."
-    systemctl stop ${cfg.virtualisation.oci-containers.backend}-fastapi-dls.service
-    systemctl start ${cfg.virtualisation.oci-containers.backend}-fastapi-dls.service
-  fi
-  '';
         serviceConfig = {
           Type = "oneshot";
           User = "root";
         };
+        script = ''
+          WORKING_DIR=${cfg.fastapi-dls.dataDir}/cert
+          CERT_CHANGED=false
+
+          recreate_private () {
+            echo "Recreating private key..."
+            rm -f $WORKING_DIR/instance.private.pem
+            openssl genrsa -out $WORKING_DIR/instance.private.pem 2048
+          }
+
+          recreate_public () {
+            echo "Recreating public key..."
+            rm -f $WORKING_DIR/instance.public.pem
+            openssl rsa -in $WORKING_DIR/instance.private.pem -outform PEM -pubout -out $WORKING_DIR/instance.public.pem
+          }
+
+          recreate_certs () {
+            echo "Recreating certificates..."
+            rm -f $WORKING_DIR/webserver.key
+            rm -f $WORKING_DIR/webserver.crt
+            openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout $WORKING_DIR/webserver.key -out $WORKING_DIR/webserver.crt -subj "/C=XX/ST=StateName/L=CityName/O=CompanyName/OU=CompanySectionName/CN=CommonNameOrHostname"
+          }
+
+          check_recreate() {
+            echo "Checking if certificates need to be recreated..."
+            if [ ! -e $WORKING_DIR/instance.private.pem ]; then
+              echo "Private key missing, recreating..."
+              recreate_private
+              recreate_public
+              recreate_certs
+              CERT_CHANGED=true
+            fi
+            if [ ! -e $WORKING_DIR/instance.public.pem ]; then
+              echo "Public key missing, recreating..."
+              recreate_public
+              recreate_certs
+              CERT_CHANGED=true
+            fi
+            if [ ! -e $WORKING_DIR/webserver.key ] || [ ! -e $WORKING_DIR/webserver.crt ]; then
+              echo "Webserver certificates missing, recreating..."
+              recreate_certs
+              CERT_CHANGED=true
+            fi
+            if ( ! openssl x509 -checkend 864000 -noout -in $WORKING_DIR/webserver.crt); then
+              echo "Webserver certificate will expire soon, recreating..."
+              recreate_certs
+              CERT_CHANGED=true
+            fi
+          }
+
+          echo "Ensuring working directory exists..."
+          if [ ! -d $WORKING_DIR ]; then
+            mkdir -p $WORKING_DIR
+          fi
+
+          check_recreate
+
+          if ( ! systemctl is-active --quiet ${cfg.virtualisation.oci-containers.backend}-fastapi-dls.service); then
+            echo "Starting ${cfg.virtualisation.oci-containers.backend}-fastapi-dls.service..."
+            systemctl start ${cfg.virtualisation.oci-containers.backend}-fastapi-dls.service
+          elif $CERT_CHANGED; then
+            echo "Restarting ${cfg.virtualisation.oci-containers.backend}-fastapi-dls.service due to certificate change..."
+            systemctl stop ${cfg.virtualisation.oci-containers.backend}-fastapi-dls.service
+            systemctl start ${cfg.virtualisation.oci-containers.backend}-fastapi-dls.service
+          fi
+        '';
       };
     })
   ];

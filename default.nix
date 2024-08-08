@@ -74,7 +74,7 @@ let
 
           sed -i '0,/^    vcfgclone \''${TARGET}\/vgpuConfig.xml /s//${lib.attrsets.foldlAttrs (s: n: v: s + "    vcfgclone \\\${TARGET}\\/vgpuConfig.xml 0x${builtins.substring 0 4 v} 0x${builtins.substring 5 4 v} 0x${builtins.substring 0 4 n} 0x${builtins.substring 5 4 n}\\n") "" cfg.copyVGPUProfiles}&/' ./patch.sh
           
-          bash ./patch.sh --repack general-merge
+          bash ./patch.sh --force-nvidia-gpl-I-know-it-is-wrong --enable-nvidia-gpl-for-experimenting --repack general-merge
           cp -a NVIDIA-Linux-x86_64-${vgpu-driver-version}-merged-vgpu-kvm-patched.run $out
         '';
   };

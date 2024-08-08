@@ -24,8 +24,6 @@ let
        ''
   );
 in
-#cd $(mktemp -d)" "cp $nvidia/vgpuConfig.xml vgpuConfig.xml
-#    ++ [ ''cat vgpuConfig.xml > $out'' ]
 let
   combinedZipName = "NVIDIA-GRID-Linux-KVM-${vgpu-driver-version}-${wdys-driver-version}.zip";
   requireFile = { name, ... }@args: pkgs.requireFile (rec {
@@ -299,7 +297,7 @@ in
         };
       };
       
-      boot.extraModprobeConfig = "options nvidia vup_sunlock=1 vup_swrlwar=1 vup_qmode=1";
+      boot.extraModprobeConfig = "options nvidia cudahost=1 vup_sunlock=1 vup_swrlwar=1 vup_qmode=1";
 
       environment.etc."nvidia/vgpuConfig/vgpuConfig.xml".source = "${pkgs.runCommand "vgpuConfigGen" { buildInputs = [ pkgs.xmlstarlet ]; } ''
         mkdir -p $out

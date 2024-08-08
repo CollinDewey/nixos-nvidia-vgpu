@@ -202,6 +202,13 @@ in
           };
         };
       };
+
+      mdevctl.enable = mkOption {
+        type = types.bool;
+        default = config.hardware.nvidia.vgpu.enable;
+        example = false;
+        description = "Enable mdevctl";
+      };
     };
   };
 
@@ -300,16 +307,27 @@ in
       boot.extraModprobeConfig = "options nvidia cudahost=1 vup_sunlock=1 vup_swrlwar=1 vup_qmode=1";
 
       environment.etc."nvidia/vgpuConfig/vgpuConfig.xml".source = "${pkgs.runCommand "vgpuConfigGen" { buildInputs = [ pkgs.xmlstarlet ]; } ''
-        mkdir -p $out
-        cd $out
-        cp --no-preserve=mode ${config.hardware.nvidia.package}/vgpuConfig.xml vgpuConfig.xml
-        ${lib.concatStringsSep "\n" (lib.mapAttrsToList profileReplace config.hardware.nvidia.vgpu.profile_overrides)}
-      ''}/vgpuConfig.xml";
-      
+          mkdir -p $out
+          cd $out
+          cp --no-preserve=mode ${config.hardware.nvidia.package}/vgpuConfig.xml vgpuConfig.xml
+          ${lib.concatStringsSep "\n" (lib.mapAttrsToList profileReplace config.hardware.nvidia.vgpu.profile_overrides)}
+        ''}/vgpuConfig.xml";
+
       boot.kernelModules = [ "nvidia-vgpu-vfio" ];
+    })
 
-      programs.mdevctl.enable = true;
-
+    (lib.mkIf cfg.mdevctl.enable {
+      environment.systemPackages = [ (pkgs.runCommand "mdevctl" {
+        buildInputs = [ pkgs.makeWrapper ];
+      }
+      ''
+        mkdir -p $out/bin $out/etc $out/usr/lib/mdevctl/scripts.d/notifiers $out/usr/lib/mdevctl/scripts.d/callouts
+        ln -s /etc/mdevctl.d $out/etc/mdevctl.d
+        ln -s /sys $out/sys
+        makeWrapper ${pkgs.mdevctl}/bin/mdevctl $out/bin/mdevctl \
+          --set MDEVCTL_ENV_ROOT $out
+      '') ];
+      environment.etc."mdevctl.d/.keep".text = "";
     })
 
     (lib.mkIf cfg.fastapi-dls.enable {

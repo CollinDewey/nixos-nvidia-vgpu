@@ -7,7 +7,25 @@ let
   wdys-driver-version = "537.70";
   minimum-kernel-version = "6.1"; # Unsure of the actual minimum. 6.1 LTS should do.
   maximum-kernel-version = "6.9";
+
+  profileReplace = name: config: lib.concatStringsSep "\n" ([ "" ]
+    ++ lib.optional (config.numDisplays != null)  ''xmlstarlet ed --inplace --pf --update "vgpuconfig/vgpuType[@name='${name}']/numHeads" --value ${toString config.numDisplays} vgpuConfig.xml''
+    ++ lib.optional (config.cudaEnabled != null)  ''xmlstarlet ed --inplace --pf --update "vgpuconfig/vgpuType[@name='${name}']/cudaEnabled" --value ${toString config.cudaEnabled} vgpuConfig.xml''
+    ++ lib.optional (config.frameLimiter != null) ''xmlstarlet ed --inplace --pf --update "vgpuconfig/vgpuType[@name='${name}']/frameLimiter" --value ${(if config.frameLimiter then "1" else "0")} vgpuConfig.xml''
+    ++ lib.optional (config.vramMB != null) ''
+       xmlstarlet ed --inplace --pf --update "vgpuconfig/vgpuType[@name='${name}']/profileSize" --value $(awk 'BEGIN {printf "0x%X", int((${toString config.vramMB}/1024) * 0x40000000)}') vgpuConfig.xml
+       xmlstarlet ed --inplace --pf --update "vgpuconfig/vgpuType[@name='${name}']/fbReservation" --value $(awk 'BEGIN {printf "0x%X", int(0x8000000 + (((${toString config.vramMB} / 1024) - 1) * 0x40000000) / 0x10)}') vgpuConfig.xml
+       xmlstarlet ed --inplace --pf --update "vgpuconfig/vgpuType[@name='${name}']/framebuffer" --value $(awk 'BEGIN {printf "0x%X", int(${toString config.vramMB} * (1024 * 1024) - (0x8000000 + (((${toString config.vramMB} / 1024) - 1) * 0x40000000) / 0x10))}') vgpuConfig.xml
+       ''
+    ++ lib.optional (config.displaySize.width != null) ''
+       xmlstarlet ed --inplace --pf --update "vgpuconfig/vgpuType[@name='${name}']/display/@width" --value ${toString config.displaySize.width} vgpuConfig.xml
+       xmlstarlet ed --inplace --pf --update "vgpuconfig/vgpuType[@name='${name}']/display/@height" --value ${toString config.displaySize.height} vgpuConfig.xml
+       xmlstarlet ed --inplace --pf --update "vgpuconfig/vgpuType[@name='${name}']/maxPixels" --value ${toString (config.displaySize.height * config.displaySize.width)} vgpuConfig.xml
+       ''
+  );
 in
+#cd $(mktemp -d)" "cp $nvidia/vgpuConfig.xml vgpuConfig.xml
+#    ++ [ ''cat vgpuConfig.xml > $out'' ]
 let
   combinedZipName = "NVIDIA-GRID-Linux-KVM-${vgpu-driver-version}-${wdys-driver-version}.zip";
   requireFile = { name, ... }@args: pkgs.requireFile (rec {
@@ -91,6 +109,68 @@ in
         '';
       };
 
+      profile_overrides = mkOption {
+        description = "List of profiles to override";
+        default = {};
+        type = types.attrsOf (types.submodule { options = { #There are more settings than this, but this is enough for now
+            numDisplays = mkOption {
+              type = types.nullOr types.ints.positive;
+              default = null;
+              example = 2;
+              description = "The number of displays";
+            };
+            vramMB = mkOption {
+              type = types.nullOr types.ints.positive;
+              default = null;
+              example = 2048;
+              description = "The VRAM size (in MB)";
+            };
+            displaySize = mkOption {
+              type = types.submodule { options = {
+                width = mkOption {
+                  type = types.nullOr types.ints.positive;
+                  default = null;
+                  example = 2560;
+                  description = "Display Width";
+                };
+                height = mkOption {
+                  type = types.nullOr types.ints.positive;
+                  default = null;
+                  example = 1440;
+                  description = "Display Height";
+                };
+              };};
+              default = {};
+              description = "Display Size";
+            };
+            cudaEnabled = mkOption {
+              type = types.nullOr types.bool;
+              default = null;
+              example = true;
+              description = "Enables CUDA";
+            };
+            frameLimiter = mkOption {
+              type = types.nullOr types.bool;
+              default = null;
+              example = false;
+              description = "Enables Framerate Limiter";
+            };
+          };
+        });
+        example = {
+          "GRID P40-2A" = {
+            numDisplays = 1;
+            vramMB = 1024;
+            displaySize = { 
+              width = 1920;
+              height = 1080;
+            };
+            cudaEnabled = true;
+            frameLimiter = false;
+          };
+        };
+      };
+
       fastapi-dls = mkOption {
         description = "fastapi-dls host server";
         default = {};
@@ -115,7 +195,7 @@ in
               example = "Europe/Lisbon";
               type = types.addCheck types.str (str: filter (c: c == " ") (stringToCharacters str) == []);
             };
-            port = mkOption {
+            port = mkOption { 
               description = "Port to listen on.";
               default = "443";
               example = "53492";
@@ -129,7 +209,17 @@ in
 
   config = lib.mkMerge [ ( lib.mkIf cfg.enable {
   
-      assertions = [
+      assertions = (lib.attrValues (
+        lib.mapAttrs (name: value: {
+          assertion = (value.displaySize.width != null) == (value.displaySize.height != null);
+          message = "Both width and height need to be set.";
+        }) cfg.profile_overrides)) ++
+        (lib.attrValues (
+          lib.mapAttrs (name: value: {
+          assertion = value.vramMB != null -> value.vramMB >= 384;
+          message = "More than 384MB of VRAM is required.";
+        }) cfg.profile_overrides)) ++
+        [
         {
           assertion = cfg.enable -> lib.elem "nvidia" config.services.xserver.videoDrivers;
           message = "hardware.nvidia.vgpu.enable requires the nvidia driver to be available (services.xserver.videoDrivers).";
@@ -141,7 +231,7 @@ in
           message = "hardware.nvidia.vgpu.enable requires a kernel at least ${minimum-kernel-version} and below ${maximum-kernel-version}";
         }
       ];
-      
+
       hardware.nvidia.package = config.boot.kernelPackages.nvidiaPackages.stable.overrideAttrs (
         { patches ? [], postUnpack ? "", postPatch ? "", preFixup ? "", ... }: {
         # Overriding https://github.com/NixOS/nixpkgs/tree/nixos-unstable/pkgs/os-specific/linux/nvidia-x11
@@ -153,7 +243,7 @@ in
 
         postPatch = (if postPatch != null then postPatch else "") + ''
           # Move path for vgpuConfig.xml into /etc
-          sed -i 's|/usr/share/nvidia/vgpu|/etc/nvidia-vgpu-xxxxx|' nvidia-vgpud
+          sed -i 's|/usr/share/nvidia/vgpu|/etc/nvidia/vgpuConfig|' nvidia-vgpud
 
           substituteInPlace sriov-manage \
             --replace-fail lspci ${pkgs.pciutils}/bin/lspci \
@@ -211,8 +301,13 @@ in
       
       boot.extraModprobeConfig = "options nvidia vup_sunlock=1 vup_swrlwar=1 vup_qmode=1";
 
-      environment.etc."nvidia-vgpu-xxxxx/vgpuConfig.xml".source = config.hardware.nvidia.package + /vgpuConfig.xml;
-
+      environment.etc."nvidia/vgpuConfig/vgpuConfig.xml".source = "${pkgs.runCommand "vgpuConfigGen" { buildInputs = [ pkgs.xmlstarlet ]; } ''
+        mkdir -p $out
+        cd $out
+        cp --no-preserve=mode ${config.hardware.nvidia.package}/vgpuConfig.xml vgpuConfig.xml
+        ${lib.concatStringsSep "\n" (lib.mapAttrsToList profileReplace config.hardware.nvidia.vgpu.profile_overrides)}
+      ''}/vgpuConfig.xml";
+      
       boot.kernelModules = [ "nvidia-vgpu-vfio" ];
 
       programs.mdevctl.enable = true;

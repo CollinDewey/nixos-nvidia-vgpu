@@ -3,19 +3,20 @@ inputs: { pkgs, lib, config, ... }:
 let
   cfg = config.hardware.nvidia.vgpu;
 
-  vgpu-driver-version = "535.129.03";
-  wdys-driver-version = "537.70";
+  gnrl-version = "535.161.07";
+  vgpu-version = "535.161.05";
+  grid-version = "535.161.08";
+  wdys-version = "538.46";
   minimum-kernel-version = "6.1"; # Unsure of the actual minimum. 6.1 LTS should do.
   maximum-kernel-version = "6.9";
 in
 let
-  combinedZipName = "NVIDIA-GRID-Linux-KVM-${vgpu-driver-version}-${wdys-driver-version}.zip";
+  combinedZipName = "NVIDIA-GRID-Linux-KVM-${vgpu-version}-${grid-version}-${wdys-version}.zip";
   requireFile = { name, ... }@args: pkgs.requireFile (rec {
     inherit name;
     url = "https://www.nvidia.com/object/vGPU-software-driver.html";
     message = ''
       Unfortunately, we cannot download file ${name} automatically.
-      This file can be extracted from ${combinedZipName}.
       Please go to ${url} to download it yourself or ask the vgpu discord community for support (https://discord.com/invite/5rQsSV3Byq)
       You can see the related nvidia driver versions here: https://docs.nvidia.com/grid/index.html. Add it to the Nix store
       using either
@@ -56,39 +57,38 @@ let
   '';
 
   compiled-driver = pkgs.stdenv.mkDerivation {
-    name = "NVIDIA-Linux-x86_64-${vgpu-driver-version}-merged-vgpu-kvm-patched";
-      nativeBuildInputs = [ pkgs.p7zip pkgs.unzip pkgs.coreutils pkgs.bash pkgs.zstd ];
-        system = "x86_64-linux";
-        src = pkgs.fetchFromGitHub {
-          owner = "VGPU-Community-Drivers";
-          repo = "vGPU-Unlock-patcher";
-          rev = "3765eee908858d069e7b31842f3486095b0846b5";
-          hash = "sha256-jNyZbaeblO66aQu9f+toT8pu3Tgj1xpdiU5DgY82Fv8=";
-          fetchSubmodules = true;
+    name = "NVIDIA-Linux-x86_64-${gnrl-version}-merged-vgpu-kvm-patched";
+    nativeBuildInputs = [ pkgs.p7zip pkgs.unzip pkgs.coreutils pkgs.bash pkgs.zstd ];
+      system = "x86_64-linux";
+      src = pkgs.fetchFromGitHub {
+        owner = "VGPU-Community-Drivers";
+        repo = "vGPU-Unlock-patcher";
+        rev = "59c75f98baf4261cf42922ba2af5d413f56f0621";
+        hash = "sha256-IUBK+ni+yy/IfjuGM++4aOLQW5vjNiufOPfXOIXCDeI=";
+        fetchSubmodules = true;
+      };
+      original_driver_src = pkgs.fetchurl {
+        url = "https://download.nvidia.com/XFree86/Linux-x86_64/${gnrl-version}/NVIDIA-Linux-x86_64-${gnrl-version}.run";
+        sha256 = "sha256-7cUn8dz6AhKjv4FevzAtRe+WY4NKQeEahR3TjaFZqM0=";
+      };
+      vgpu_driver_src = requireFile {
+          name = combinedZipName;
+          sha256 = cfg.vgpu_driver_src.sha256;
         };
-        original_driver_src = pkgs.fetchurl {
-          url = "https://download.nvidia.com/XFree86/Linux-x86_64/${vgpu-driver-version}/NVIDIA-Linux-x86_64-${vgpu-driver-version}.run";
-          sha256 = "e6dca5626a2608c6bb2a046cfcb7c1af338b9e961a7dd90ac09bb8a126ff002e";
-        };
-        vgpu_driver_src = requireFile {
-            name = "NVIDIA-GRID-Linux-KVM-${vgpu-driver-version}-${wdys-driver-version}.zip";
-            sha256 = cfg.vgpu_driver_src.sha256;
-          };
- 
-        buildPhase = ''
-          mkdir -p $out
-          cd $TMPDIR
-          ln -s $vgpu_driver_src NVIDIA-GRID-Linux-KVM-${vgpu-driver-version}-${wdys-driver-version}.zip
-          
-          ${pkgs.unzip}/bin/unzip -j NVIDIA-GRID-Linux-KVM-${vgpu-driver-version}-${wdys-driver-version}.zip Host_Drivers/NVIDIA-Linux-x86_64-${vgpu-driver-version}-vgpu-kvm.run
-          cp -a $src/* .
-          cp -a $original_driver_src NVIDIA-Linux-x86_64-${vgpu-driver-version}.run
 
-          sed -i '0,/^    vcfgclone \''${TARGET}\/vgpuConfig.xml /s//${lib.attrsets.foldlAttrs (s: n: v: s + "    vcfgclone \\\${TARGET}\\/vgpuConfig.xml 0x${builtins.substring 0 4 v} 0x${builtins.substring 5 4 v} 0x${builtins.substring 0 4 n} 0x${builtins.substring 5 4 n}\\n") "" cfg.copyVGPUProfiles}&/' ./patch.sh
-          
-          bash ./patch.sh --force-nvidia-gpl-I-know-it-is-wrong --enable-nvidia-gpl-for-experimenting --repack general-merge
-          cp -a NVIDIA-Linux-x86_64-${vgpu-driver-version}-merged-vgpu-kvm-patched.run $out
-        '';
+      buildPhase = ''
+        mkdir -p $out
+        cd $TMPDIR
+        ln -s $vgpu_driver_src ${combinedZipName}
+        
+        ${pkgs.unzip}/bin/unzip -j ${combinedZipName} Host_Drivers/NVIDIA-Linux-x86_64-${vgpu-version}-vgpu-kvm.run
+        cp -a $src/* .
+        cp -a $original_driver_src NVIDIA-Linux-x86_64-${gnrl-version}.run
+        sed -i '0,/^    vcfgclone \''${TARGET}\/vgpuConfig.xml /s//${lib.attrsets.foldlAttrs (s: n: v: s + "    vcfgclone \\\${TARGET}\\/vgpuConfig.xml 0x${builtins.substring 0 4 v} 0x${builtins.substring 5 4 v} 0x${builtins.substring 0 4 n} 0x${builtins.substring 5 4 n}\\n") "" cfg.copyVGPUProfiles}&/' ./patch.sh
+        
+        bash ./patch.sh --force-nvidia-gpl-I-know-it-is-wrong --enable-nvidia-gpl-for-experimenting --repack general-merge
+        cp -a NVIDIA-Linux-x86_64-${gnrl-version}-merged-vgpu-kvm-patched.run $out
+      '';
   };
 in
 {
@@ -111,7 +111,7 @@ in
       };
 
       vgpu_driver_src.sha256 = mkOption {
-        default = "sha256-tFgDf7ZSIZRkvImO+9YglrLimGJMZ/fz25gjUT0TfDo=";
+        default = "sha256-uXBzzFcDfim1z9SOrZ4hz0iGCElEdN7l+rmXDbZ6ugs=";
         type = types.str;
         description = ''
           sha256 of the vgpu_driver file in case you're having trouble adding it with for Example `nix-store --add-fixed sha256 NVIDIA-GRID-Linux-KVM-535.129.03-537.70.zip`
@@ -253,10 +253,10 @@ in
         { patches ? [], postUnpack ? "", postPatch ? "", preFixup ? "", ... }: {
         # Overriding https://github.com/NixOS/nixpkgs/tree/nixos-unstable/pkgs/os-specific/linux/nvidia-x11
         # that gets called from the option hardware.nvidia.package from here: https://github.com/NixOS/nixpkgs/blob/nixos-22.11/nixos/modules/hardware/video/nvidia.nix
-        name = "NVIDIA-Linux-x86_64-${vgpu-driver-version}-merged-vgpu-kvm-patched-${config.boot.kernelPackages.kernel.version}";
-        version = "${vgpu-driver-version}";
+        name = "NVIDIA-Linux-x86_64-${gnrl-version}-merged-vgpu-kvm-patched-${config.boot.kernelPackages.kernel.version}";
+        version = "${gnrl-version}";
 
-        src = "${compiled-driver}/NVIDIA-Linux-x86_64-${vgpu-driver-version}-merged-vgpu-kvm-patched.run";
+        src = "${compiled-driver}/NVIDIA-Linux-x86_64-${gnrl-version}-merged-vgpu-kvm-patched.run";
 
         postPatch = (if postPatch != null then postPatch else "") + ''
           # Move path for vgpuConfig.xml into /etc
@@ -269,10 +269,10 @@ in
 
         # HACK: Using preFixup instead of postInstall since nvidia-x11 builder.sh doesn't support hooks
         preFixup = preFixup + ''
-          for i in libnvidia-vgpu.so.${vgpu-driver-version} libnvidia-vgxcfg.so.${vgpu-driver-version}; do
+          for i in libnvidia-vgpu.so.${vgpu-version} libnvidia-vgxcfg.so.${vgpu-version}; do
             install -Dm755 "$i" "$out/lib/$i"
           done
-          patchelf --set-rpath ${pkgs.stdenv.cc.cc.lib}/lib $out/lib/libnvidia-vgpu.so.${vgpu-driver-version}
+          patchelf --set-rpath ${pkgs.stdenv.cc.cc.lib}/lib $out/lib/libnvidia-vgpu.so.${vgpu-version}
           install -Dm644 vgpuConfig.xml $out/vgpuConfig.xml
 
           for i in nvidia-vgpud nvidia-vgpu-mgr; do

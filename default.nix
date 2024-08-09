@@ -7,22 +7,6 @@ let
   wdys-driver-version = "537.70";
   minimum-kernel-version = "6.1"; # Unsure of the actual minimum. 6.1 LTS should do.
   maximum-kernel-version = "6.9";
-
-  profileReplace = name: config: lib.concatStringsSep "\n" ([ "" ]
-    ++ lib.optional (config.numDisplays != null)  ''xmlstarlet ed --inplace --pf --update "vgpuconfig/vgpuType[@name='${name}']/numHeads" --value ${toString config.numDisplays} vgpuConfig.xml''
-    ++ lib.optional (config.cudaEnabled != null)  ''xmlstarlet ed --inplace --pf --update "vgpuconfig/vgpuType[@name='${name}']/cudaEnabled" --value ${toString config.cudaEnabled} vgpuConfig.xml''
-    ++ lib.optional (config.frameLimiter != null) ''xmlstarlet ed --inplace --pf --update "vgpuconfig/vgpuType[@name='${name}']/frameLimiter" --value ${(if config.frameLimiter then "1" else "0")} vgpuConfig.xml''
-    ++ lib.optional (config.vramMB != null) ''
-       xmlstarlet ed --inplace --pf --update "vgpuconfig/vgpuType[@name='${name}']/profileSize" --value $(awk 'BEGIN {printf "0x%X", int((${toString config.vramMB}/1024) * 0x40000000)}') vgpuConfig.xml
-       xmlstarlet ed --inplace --pf --update "vgpuconfig/vgpuType[@name='${name}']/fbReservation" --value $(awk 'BEGIN {printf "0x%X", int(0x8000000 + (((${toString config.vramMB} / 1024) - 1) * 0x40000000) / 0x10)}') vgpuConfig.xml
-       xmlstarlet ed --inplace --pf --update "vgpuconfig/vgpuType[@name='${name}']/framebuffer" --value $(awk 'BEGIN {printf "0x%X", int(${toString config.vramMB} * (1024 * 1024) - (0x8000000 + (((${toString config.vramMB} / 1024) - 1) * 0x40000000) / 0x10))}') vgpuConfig.xml
-       ''
-    ++ lib.optional (config.displaySize.width != null) ''
-       xmlstarlet ed --inplace --pf --update "vgpuconfig/vgpuType[@name='${name}']/display/@width" --value ${toString config.displaySize.width} vgpuConfig.xml
-       xmlstarlet ed --inplace --pf --update "vgpuconfig/vgpuType[@name='${name}']/display/@height" --value ${toString config.displaySize.height} vgpuConfig.xml
-       xmlstarlet ed --inplace --pf --update "vgpuconfig/vgpuType[@name='${name}']/maxPixels" --value ${toString (config.displaySize.height * config.displaySize.width)} vgpuConfig.xml
-       ''
-  );
 in
 let
   combinedZipName = "NVIDIA-GRID-Linux-KVM-${vgpu-driver-version}-${wdys-driver-version}.zip";
@@ -42,6 +26,34 @@ let
       If you already added the file, maybe the sha256 is wrong, use "nix hash file ${name}" and the option vgpu_driver_src.sha256 to override the hardcoded hash.
     '';
   } // args);
+
+  profileReplace = name: config: let 
+    xmlCommand = ''xmlstarlet ed --inplace --pf --update "vgpuconfig/vgpuType[@name='${name}']'';
+  in lib.concatStringsSep "\n" ([ "" ]
+    ++ lib.optional (config.numDisplays != null)  ''${xmlCommand}/numHeads" --value ${toString config.numDisplays} vgpuConfig.xml''
+    ++ lib.optional (config.cudaEnabled != null)  ''${xmlCommand}/cudaEnabled" --value ${toString config.cudaEnabled} vgpuConfig.xml''
+    ++ lib.optional (config.frameLimiter != null) ''${xmlCommand}/frame_rate_limiter" --value ${(if config.frameLimiter then "1" else "0")} vgpuConfig.xml''
+    ++ lib.optional (config.vramMB != null) ''
+       ${xmlCommand}/profileSize" --value $(awk 'BEGIN {printf "0x%X", int((${toString config.vramMB}/1024) * 0x40000000)}') vgpuConfig.xml
+       ${xmlCommand}/fbReservation" --value $(awk 'BEGIN {printf "0x%X", int(0x8000000 + (((${toString config.vramMB} / 1024) - 1) * 0x40000000) / 0x10)}') vgpuConfig.xml
+       ${xmlCommand}/framebuffer" --value $(awk 'BEGIN {printf "0x%X", int(${toString config.vramMB} * (1024 * 1024) - (0x8000000 + (((${toString config.vramMB} / 1024) - 1) * 0x40000000) / 0x10))}') vgpuConfig.xml
+       ''
+    ++ lib.optional (config.displaySize.width != null) ''
+       ${xmlCommand}/display/@width" --value ${toString config.displaySize.width} vgpuConfig.xml
+       ${xmlCommand}/display/@height" --value ${toString config.displaySize.height} vgpuConfig.xml
+       ${xmlCommand}/maxPixels" --value ${toString (config.displaySize.height * config.displaySize.width)} vgpuConfig.xml
+       ''
+  );
+
+  mdevctl = pkgs.runCommand "mdevctl" { buildInputs = [ pkgs.makeWrapper ]; } ''
+    mkdir -p $out/bin $out/etc $out/usr/lib/mdevctl/scripts.d/notifiers $out/usr/lib/mdevctl/scripts.d/callouts $out/lib/udev/rules.d
+    ln -s /etc/mdevctl.d $out/etc/mdevctl.d
+    ln -s /sys $out/sys
+    substitute ${pkgs.mdevctl}/lib/udev/rules.d/60-mdevctl.rules $out/lib/udev/rules.d/60-mdevctl.rules \
+      --replace /usr/sbin/ $out/
+    makeWrapper ${pkgs.mdevctl}/bin/mdevctl $out/bin/mdevctl \
+      --set MDEVCTL_ENV_ROOT $out
+  '';
 
   compiled-driver = pkgs.stdenv.mkDerivation {
     name = "NVIDIA-Linux-x86_64-${vgpu-driver-version}-merged-vgpu-kvm-patched";
@@ -317,16 +329,8 @@ in
     })
 
     (lib.mkIf cfg.mdevctl.enable {
-      environment.systemPackages = [ (pkgs.runCommand "mdevctl" {
-        buildInputs = [ pkgs.makeWrapper ];
-      }
-      ''
-        mkdir -p $out/bin $out/etc $out/usr/lib/mdevctl/scripts.d/notifiers $out/usr/lib/mdevctl/scripts.d/callouts
-        ln -s /etc/mdevctl.d $out/etc/mdevctl.d
-        ln -s /sys $out/sys
-        makeWrapper ${pkgs.mdevctl}/bin/mdevctl $out/bin/mdevctl \
-          --set MDEVCTL_ENV_ROOT $out
-      '') ];
+      environment.systemPackages = [ mdevctl ];
+      services.udev.packages = [ mdevctl ];
       environment.etc."mdevctl.d/.keep".text = "";
     })
 

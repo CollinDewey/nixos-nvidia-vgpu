@@ -3,13 +3,21 @@
 
   inputs = {
     nixpkgs = {
-      url = "https://github.com/NixOS/nixpkgs/archive/9f4128e00b0ae8ec65918efeba59db998750ead6.tar.gz"; # a working revision (09/07/2024)
+      url = "github:NixOS/nixpkgs/nixos-unstable";
     };
   };
 
-  outputs = { self, nixpkgs,... }@inputs: {
-    nixosModules.nvidia-vgpu = import ./default.nix inputs;
+  outputs = { nixpkgs, ... }: let
+    pkgs = import nixpkgs { system = "x86_64-linux"; };
+    gnrl-version = "535.161.07";
+    vgpu-version = "535.161.05";
+    grid-version = "535.161.08";
+    wdys-version = "538.46";
+    release-version = "16.5";
+    minimum-kernel-version = "6.1"; # Unsure of the actual minimum. 6.1 LTS should do.
+    maximum-kernel-version = "6.9";
+  in {
+    nixosModules.nvidia-vgpu = import ./module.nix { inherit pkgs gnrl-version vgpu-version grid-version wdys-version minimum-kernel-version maximum-kernel-version; };
+    packages."x86_64-linux".default = import ./windows.nix { inherit pkgs wdys-version release-version; };
   };
 }
-
-

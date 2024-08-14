@@ -2,10 +2,10 @@
 
 let
   cfg = config.hardware.nvidia.vgpu;
-  gnrl-version = "535.161.07";
-  vgpu-version = "535.161.05";
-  grid-version = "535.161.08";
-  wdys-version = "538.46";
+  gnrl-version = "550.90.07";
+  vgpu-version = "550.90.05";
+  grid-version = "550.90.07";
+  wdys-version = "552.55";
   minimum-kernel-version = "6.1"; # Unsure of the actual minimum. 6.1 LTS should do.
   maximum-kernel-version = "6.9";
 in
@@ -62,13 +62,13 @@ let
       src = pkgs.fetchFromGitHub {
         owner = "VGPU-Community-Drivers";
         repo = "vGPU-Unlock-patcher";
-        rev = "59c75f98baf4261cf42922ba2af5d413f56f0621";
-        hash = "sha256-IUBK+ni+yy/IfjuGM++4aOLQW5vjNiufOPfXOIXCDeI=";
+        rev = "8f19e550540dcdeccaded6cb61a71483ea00d509";
+        hash = "sha256-TyZkZcv7RI40U8czvcE/kIagpUFS/EJhVN0SYPzdNJM=";
         fetchSubmodules = true;
       };
       original_driver_src = pkgs.fetchurl {
         url = "https://download.nvidia.com/XFree86/Linux-x86_64/${gnrl-version}/NVIDIA-Linux-x86_64-${gnrl-version}.run";
-        sha256 = "sha256-7cUn8dz6AhKjv4FevzAtRe+WY4NKQeEahR3TjaFZqM0=";
+        sha256 = "sha256-Uaz1edWpiE9XOh0/Ui5/r6XnhB4iqc7AtLvq4xsLlzM=";
       };
       vgpu_driver_src = requireFile {
           name = combinedZipName;
@@ -110,7 +110,7 @@ in
       };
 
       vgpu_driver_src.sha256 = mkOption {
-        default = "sha256-uXBzzFcDfim1z9SOrZ4hz0iGCElEdN7l+rmXDbZ6ugs=";
+        default = "sha256-qzTsKUKKdplZFnmcz4r5zGGTruyM7e85zRu3hQDc0gA=";
         type = types.str;
         description = ''
           sha256 of the vgpu_driver file in case you're having trouble adding it with for Example `nix-store --add-fixed sha256 NVIDIA-GRID-Linux-KVM-535.129.03-537.70.zip`
@@ -315,7 +315,7 @@ in
         };
       };
       
-      boot.extraModprobeConfig = "options nvidia cudahost=1 vup_sunlock=1 vup_swrlwar=1 vup_qmode=1";
+      boot.extraModprobeConfig = "options nvidia vup_sunlock=1 vup_qmode=1";
 
       environment.etc."nvidia/vgpuConfig/vgpuConfig.xml".source = "${pkgs.runCommand "vgpuConfigGen" { buildInputs = [ pkgs.xmlstarlet ]; } ''
           mkdir -p $out

@@ -374,6 +374,7 @@ in
 
       systemd.services.fastapi-dls-mgr = {
         path = [ pkgs.openssl ];
+        requires = [ "${config.virtualisation.oci-containers.backend}.service" ];
         serviceConfig = {
           Type = "oneshot";
           User = "root";

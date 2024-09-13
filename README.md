@@ -15,7 +15,7 @@ This module is for host machines, it installs a merged driver, meaning the host 
    ```nix
    # configuration.nix
      imports = [
-       (builtins.getFlake "https://github.com/Yeshey/nixos-nvidia-vgpu/archive/refs/heads/development.zip").nixosModules.nvidia-vgpu
+       (builtins.getFlake "https://github.com/CollinDewey/nixos-nvidia-vgpu/archive/refs/heads/main.zip").nixosModules.nvidia-vgpu
      ];
 
      hardware.nvidia.vgpu = #...module config...
@@ -30,7 +30,7 @@ This module is for host machines, it installs a merged driver, meaning the host 
        nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
        nixos-nvidia-vgpu = {
-         url = "github:CollinDewey/nixos-nvidia-vgpu/16.5";
+         url = "github:CollinDewey/nixos-nvidia-vgpu";
          inputs.nixpkgs.follows = "nixpkgs";
        };
      };
@@ -86,7 +86,7 @@ This module is for host machines, it installs a merged driver, meaning the host 
 ## Requirements
 
 - Unlockable consumer NVIDIA GPU card (can't be `Ampere` architecture)
-  - [These](https://github.com/VGPU-Community-Drivers/vGPU-Unlock-patcher/blob/535.161/patch.sh) are the graphic cards the driver supports.  
+  - [These](https://github.com/VGPU-Community-Drivers/vGPU-Unlock-patcher/blob/550.90/patch.sh) are the graphic cards the driver supports.  
     Listed below for convenience
     ```
     RTX 2080 Ti
@@ -137,8 +137,7 @@ In the Windows VM you need to install the appropriate drivers too, if you use an
 
 Besides the above profiles there are vGaming profiles, the ones I recommend, I used the special `GeForce RTX 2070-` profiles (from `mdevctl types`).  
 If using this profile, you should be able to install the normal corresponding NVIDIA driver for the windows guest, it will support vulkan, opengl, directx and such for games but not CUDA.  
-If you're having trouble with the licensing (altho fastapi-dls should be able to deal with it), you might have to install a specific driver like [this one](https://nvidia-gaming.s3.us-east-1.amazonaws.com/windows/528.49_Cloud_Gaming_win10_win11_server2019_server2022_dch_64bit_international.exe).   
-Here is the explenation of where that driver is from:
+If you're having trouble with the licensing (altho fastapi-dls should be able to deal with it), you might have to install a specific Cloud Gaming driver.
 > vGaming is specially licensed.  
 > There's no trial and you need to buy a compute cluster from NVIDIA.  
 > But Amazon has this and they host the drivers for people to use.

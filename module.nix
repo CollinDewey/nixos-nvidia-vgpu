@@ -301,6 +301,7 @@ in
         description = "NVIDIA vGPU Manager Daemon";
         wants = [ "syslog.target" ];
         wantedBy = [ "multi-user.target" ];
+        after = [ "nvidia-vgpud.service" ];
 
         serviceConfig = {
           Type = "forking";

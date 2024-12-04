@@ -257,6 +257,8 @@ in
 
         src = "${compiled-driver}/NVIDIA-Linux-x86_64-${gnrl-version}-merged-vgpu-kvm-patched.run";
 
+        patches = [];
+
         postPatch = (if postPatch != null then postPatch else "") + ''
           # Move path for vgpuConfig.xml into /etc
           sed -i 's|/usr/share/nvidia/vgpu|/etc/nvidia/vgpuConfig|' nvidia-vgpud

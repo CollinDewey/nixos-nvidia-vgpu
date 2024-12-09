@@ -70,7 +70,10 @@ let
         url = "https://download.nvidia.com/XFree86/Linux-x86_64/${gnrl-version}/NVIDIA-Linux-x86_64-${gnrl-version}.run";
         sha256 = "sha256-Uaz1edWpiE9XOh0/Ui5/r6XnhB4iqc7AtLvq4xsLlzM=";
       };
-      vgpu_driver_src = requireFile {
+      vgpu_driver_src = if cfg.vgpu_driver_src.url != null then pkgs.fetchurl {
+        url = cfg.vgpu_driver_src.url;
+        sha256 = cfg.vgpu_driver_src.sha256;
+      } else requireFile {
           name = combinedZipName;
           sha256 = cfg.vgpu_driver_src.sha256;
       };
@@ -106,6 +109,15 @@ in
           Adds vcfgclone lines to the patch.sh script of the vgpu-unlock-patcher.
           They copy the vGPU profiles of officially supported GPUs specified by the attribute value to the video card specified by the attribute name. Not required when vcfgclone line with your GPU is already in the script. CASE-SENSETIVE, use UPPER case. Copy profiles from a GPU with a similar chip or at least architecture, otherwise nothing will work. See patch.sh for working vcfgclone examples.
           In the first example option value, it will copy the vGPU profiles of 5566:7788 to GPU 1122:3344 (vcfgclone ''${TARGET}/vgpuConfig.xml 0x5566 0x7788 0x1122 0x3344 in patch.sh).
+        '';
+      };
+
+      vgpu_driver_src.url = mkOption {
+        default = null;
+        type = types.nullOr types.str;
+        example = "https://example.com/${combinedZipName}";
+        description = ''
+          URL of the vgpu_driver_file to be downloaded from
         '';
       };
 

@@ -226,11 +226,35 @@ in
         };
       };
 
-      mdevctl.enable = mkOption {
-        type = types.bool;
-        default = config.hardware.nvidia.vgpu.enable;
-        example = false;
-        description = "Enable mdevctl";
+      mdev = {
+        enable = mkOption {
+          type = types.bool;
+          default = config.hardware.nvidia.vgpu.enable;
+          example = false;
+          description = "Enable mdev";
+        };
+        mdevctl.enable = mkOption {
+          type = types.bool;
+          default = config.hardware.nvidia.vgpu.enable;
+          example = false;
+          description = "Enable mdevctl";
+        };
+        device = mkOption {
+          type = types.str;
+          default = "0000:04:00.0";
+          description = "PCI ID of graphics card. You can figure it with {command}`ls /sys/class/mdev_bus`.";
+        };
+        vgpus = mkOption {
+          default = { };
+          type = with types; attrsOf (submodule [ { options = { uuid = mkOption { type = with types; listOf str; }; }; } ]);
+          description = ''
+            Virtual GPUs to be used in Qemu. You can find devices via {command}`ls /sys/bus/pci/devices/*/mdev_supported_types`
+            and find info about device via {command}`cat /sys/bus/pci/devices/*/mdev_supported_types/nvidia-261/description`
+          '';
+          example = {
+            nvidia-261.uuid = [ "57d6c526-375a-466f-b9a7-963f63e91197" ];
+          };
+        };
       };
     };
   };
@@ -342,10 +366,32 @@ in
       boot.kernelModules = [ "nvidia-vgpu-vfio" ];
     })
 
-    (lib.mkIf cfg.mdevctl.enable {
+    (lib.mkIf cfg.mdev.mdevctl.enable {
       environment.systemPackages = [ mdevctl ];
       services.udev.packages = [ mdevctl ];
       environment.etc."mdevctl.d/.keep".text = "";
+    })
+
+    (lib.mkIf cfg.mdev.enable {
+      systemd = let
+        vgpus = lib.listToAttrs (lib.flatten (lib.mapAttrsToList
+          (mdev: opt: map (id: lib.nameValuePair "nvidia-vgpu-${id}" { inherit mdev; uuid = id; }) opt.uuid)
+          cfg.mdev.vgpus));
+      in {
+        services = lib.mapAttrs (_: opt:
+          {
+            description = "NVIDIA VGPU ${opt.uuid}";
+            after = [ "nvidia-vgpu-mgr.service" ];
+
+            unitConfig.ConditionDirectoryNotEmpty = "/sys/bus/pci/devices/${cfg.mdev.device}/mdev_supported_types";
+            serviceConfig = {
+              Type = "oneshot";
+              RemainAfterExit = true;
+              ExecStart = "${pkgs.bash}/bin/bash -c 'if [ ! -e /sys/bus/pci/devices/${cfg.mdev.device}/${opt.uuid} ]; then echo ${opt.uuid} > /sys/bus/pci/devices/${cfg.mdev.device}/mdev_supported_types/${opt.mdev}/create; fi'";
+              ExecStop = "${pkgs.bash}/bin/bash -c 'if [ -e /sys/bus/pci/devices/${cfg.mdev.device}/${opt.uuid} ]; then echo 1 > /sys/bus/pci/devices/${cfg.mdev.device}/${opt.uuid}/remove; fi'";
+            };
+          }) vgpus;
+      };
     })
 
     (lib.mkIf cfg.fastapi-dls.enable {

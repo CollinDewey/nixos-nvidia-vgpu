@@ -7,6 +7,9 @@ This module is for host machines, it installs a merged driver, meaning the host 
 > [!WARNING]  
 > Activating this module may make some games stop working on the host, check [Known Issues](#known-issues).
 
+> [!NOTE]
+> Once fastapi-dls is merged into nixpkgs [PR #358647](https://github.com/NixOS/nixpkgs/pull/358647), move to using that.
+
 ## Installation:
 
 1. Add Module to NixOS

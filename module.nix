@@ -326,6 +326,7 @@ in
         description = "NVIDIA vGPU Daemon";
         wants = [ "syslog.target" ];
         wantedBy = [ "multi-user.target" ];
+        restartIfChanged = false;
 
         serviceConfig = {
           Type = "forking";
@@ -340,6 +341,7 @@ in
         wants = [ "syslog.target" ];
         wantedBy = [ "multi-user.target" ];
         after = [ "nvidia-vgpud.service" ];
+        restartIfChanged = false;
 
         serviceConfig = {
           Type = "forking";

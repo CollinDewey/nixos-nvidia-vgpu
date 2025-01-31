@@ -383,6 +383,7 @@ in
             description = "NVIDIA VGPU ${opt.uuid}";
             after = [ "nvidia-vgpu-mgr.service" ];
             wantedBy = [ "multi-user.target" ];
+            restartIfChanged = false;
 
             unitConfig.ConditionDirectoryNotEmpty = "/sys/bus/pci/devices/${cfg.mdev.device}/mdev_supported_types";
             serviceConfig = {

@@ -46,7 +46,7 @@ let
   );
 
   mdevctl = pkgs.runCommand "mdevctl" { buildInputs = [ pkgs.makeWrapper ]; } ''
-    mkdir -p $out/bin $out/etc $out/usr/lib/mdevctl/scripts.d/notifiers $out/usr/lib/mdevctl/scripts.d/callouts $out/lib/udev/rules.d
+    mkdir -p $out/bin $out/etc $out/etc/mdevctl/scripts.d/notifiers $out/etc/mdevctl/scripts.d/callouts $out/lib/udev/rules.d
     ln -s /etc/mdevctl.d $out/etc/mdevctl.d
     ln -s /sys $out/sys
     substitute ${pkgs.mdevctl}/lib/udev/rules.d/60-mdevctl.rules $out/lib/udev/rules.d/60-mdevctl.rules \

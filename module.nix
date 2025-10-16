@@ -290,6 +290,7 @@ in
         # that gets called from the option hardware.nvidia.package from here: https://github.com/NixOS/nixpkgs/blob/nixos-22.11/nixos/modules/hardware/video/nvidia.nix
         name = "NVIDIA-Linux-x86_64-${gnrl-version}-merged-vgpu-kvm-patched-${config.boot.kernelPackages.kernel.version}";
         version = "${gnrl-version}";
+        persistencedSha256 = "sha256-qe8e1Nxla7F0U88AbnOZm6cHxo57pnLCqtjdvOvq9jk=";
 
         src = "${compiled-driver}/NVIDIA-Linux-x86_64-${gnrl-version}-merged-vgpu-kvm-patched.run";
 

@@ -284,13 +284,19 @@ in
         }
       ];
 
-      hardware.nvidia.package = config.boot.kernelPackages.nvidiaPackages.stable.overrideAttrs (
+      hardware.nvidia.package = (config.boot.kernelPackages.nvidiaPackages.mkDriver {
+        version = "550.90.07";
+        sha256_64bit = "sha256-Uaz1edWpiE9XOh0/Ui5/r6XnhB4iqc7AtLvq4xsLlzM=";
+        sha256_aarch64 = "sha256-uJa3auRlMHr8WyacQL2MyyeebqfT7K6VU0qR7LGXFXI=";
+        openSha256 = "sha256-VLmh7eH0xhEu/AK+Osb9vtqAFni+lx84P/bo4ZgCqj8=";
+        settingsSha256 = "sha256-sX9dHEp9zH9t3RWp727lLCeJLo8QRAGhVb8iN6eX49g=";
+        persistencedSha256 = "sha256-qe8e1Nxla7F0U88AbnOZm6cHxo57pnLCqtjdvOvq9jk=";
+      }).overrideAttrs (
         { patches ? [], postUnpack ? "", postPatch ? "", preFixup ? "", ... }: {
         # Overriding https://github.com/NixOS/nixpkgs/tree/nixos-unstable/pkgs/os-specific/linux/nvidia-x11
         # that gets called from the option hardware.nvidia.package from here: https://github.com/NixOS/nixpkgs/blob/nixos-22.11/nixos/modules/hardware/video/nvidia.nix
         name = "NVIDIA-Linux-x86_64-${gnrl-version}-merged-vgpu-kvm-patched-${config.boot.kernelPackages.kernel.version}";
         version = "${gnrl-version}";
-        persistencedSha256 = "sha256-qe8e1Nxla7F0U88AbnOZm6cHxo57pnLCqtjdvOvq9jk=";
 
         src = "${compiled-driver}/NVIDIA-Linux-x86_64-${gnrl-version}-merged-vgpu-kvm-patched.run";
 
